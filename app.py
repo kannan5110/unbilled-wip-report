@@ -1,21 +1,30 @@
 import streamlit as st
-
-st.set_page_config(
-    page_title="Unbilled WIP Report Generator",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
 import pandas as pd
 import io
-import os
 from datetime import datetime
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment, PatternFill
 from openpyxl.utils import get_column_letter
+from PIL import Image
 
-# Define required headers for filtering
+# Set page configuration
+st.set_page_config(
+    page_title="Unbilled WIP Report Generator",
+    page_icon="📊",
+    layout="wide"
+)
+
+# Load and display logo
+logo = Image.open("image.png")
+st.image(logo, width=100)
+
+# Markdown header
+st.markdown("""
+# 📊 Unbilled WIP Report Generator
+Welcome! Upload your Fast Track Excel file to generate a clean report.
+""")
+
+# Required headers
 required_headers = [
     "Brand", "Timesheet ID", "Timesheet Code", "Client Ref", "Client Name",
     "Invoice Group", "Interpreter Status", "Purchase Order", "Job Order ID",
@@ -37,14 +46,12 @@ manpower_groups = {
     "TCS -Weekly- Consolidated- No PO - 560 Back up"
 }
 
-# Streamlit UI
-st.title("Unbilled WIP Report Generator")
+# File uploader
 uploaded_file = st.file_uploader("Upload Fast Track Excel File (.xlsx)", type=["xlsx"])
 
 if uploaded_file:
     df_raw = pd.read_excel(uploaded_file, engine="openpyxl")
 
-    # Ensure required headers exist
     for header in required_headers:
         if header not in df_raw.columns:
             df_raw[header] = ""
@@ -57,19 +64,12 @@ if uploaded_file:
         return ""
 
     df_raw["Brand"] = df_raw["Invoice Group"].apply(determine_brand)
-
-    # Convert Week ending date to datetime and remove blanks
     df_raw["Week ending date"] = pd.to_datetime(df_raw["Week ending date"], errors='coerce')
-    df_raw = df_raw[df_raw["Week ending date"].notna()]  # Remove rows with blank/invalid dates
-
-    # Sort by Client Name, Contractor Name, Week ending date
+    df_raw = df_raw[df_raw["Week ending date"].notna()]
     df_raw.sort_values(by=["Client Name", "Contractor Name", "Week ending date"], inplace=True)
-
-    # Format Week ending date to MM/DD/YYYY
     df_raw["Week ending date"] = df_raw["Week ending date"].dt.strftime('%m/%d/%Y')
-
-    # Filter only required headers
     df_raw = df_raw[required_headers]
+
     df_experis = df_raw[df_raw["Brand"] == "Experis"]
     df_manpower = df_raw[df_raw["Brand"].isin(["Manpower", "Talent Solutions"])]
 
@@ -121,17 +121,3 @@ if uploaded_file:
     st.success("✅ Report generated successfully!")
     st.download_button("📥 Download Unbilled WIP Report", final_output.getvalue(), file_name,
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
-    # Save to predefined path
-    predefined_folder = "C:/Reports/Unbilled WIP"
-    predefined_path = os.path.join(predefined_folder, file_name)
-
-    if st.button("💾 Save to Predefined Folder"):
-        try:
-            os.makedirs(predefined_folder, exist_ok=True)
-            with open(predefined_path, "wb") as f:
-                f.write(final_output.getvalue())
-            st.success("✅ File saved successfully!")
-            st.markdown(f"📁 **Saved Location:** `{predefined_path}`")
-        except Exception as e:
-            st.error(f"❌ Failed to save file: {e}")
